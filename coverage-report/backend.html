@@ -1,0 +1,603 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>api: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">calculator/internal/api/handlers.go (93.9%)</option>
+				
+				<option value="file1">calculator/internal/api/router.go (100.0%)</option>
+				
+				<option value="file2">calculator/internal/api/static.go (100.0%)</option>
+				
+				<option value="file3">calculator/internal/calc/errors.go (100.0%)</option>
+				
+				<option value="file4">calculator/internal/calc/evaluate.go (100.0%)</option>
+				
+				<option value="file5">calculator/internal/calc/limits.go (91.7%)</option>
+				
+				<option value="file6">calculator/internal/calc/number.go (96.8%)</option>
+				
+				<option value="file7">calculator/internal/calc/operator.go (100.0%)</option>
+				
+				<option value="file8">calculator/main.go (47.1%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package api
+
+import (
+        "encoding/json"
+        "errors"
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+
+        "calculator/internal/calc"
+)
+
+// maxBodyBytes caps request bodies; a valid request is well under 1 KB.
+const maxBodyBytes = 1 &lt;&lt; 10
+
+var errBadRequestBody = &amp;calc.Error{Code: calc.CodeInvalidInput, Message: "Invalid request body"}
+
+// calculate returns the handler for one operator endpoint.
+func calculate(op calc.Operator) gin.HandlerFunc {
+        <span class="cov8" title="1">return func(c *gin.Context) </span>{
+                <span class="cov8" title="1">var req CalculateRequest
+                c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBodyBytes)
+                if err := json.NewDecoder(c.Request.Body).Decode(&amp;req); err != nil </span>{
+                        <span class="cov8" title="1">respondError(c, nil, errBadRequestBody)
+                        return
+</span>                }
+
+                <span class="cov8" title="1">left, err := calc.ParseNumber(req.Left)
+                if err != nil </span>{
+                        <span class="cov8" title="1">respondError(c, nil, err)
+                        return
+</span>                }
+                <span class="cov8" title="1">right, err := calc.ParseNumber(req.Right)
+                if err != nil </span>{
+                        <span class="cov8" title="1">respondError(c, nil, err)
+                        return
+</span>                }
+
+                <span class="cov8" title="1">operation := &amp;Operation{
+                        Operator: op,
+                        Left:     calc.FormatNumber(left),
+                        Right:    calc.FormatNumber(right),
+</span>                }
+                <span class="cov8" title="1">value, err := calc.Evaluate(op, left, right)
+                if err != nil </span>{
+                        <span class="cov8" title="1">respondError(c, operation, err)
+                        return
+</span>                }
+
+                <span class="cov8" title="1">result := calc.FormatNumber(value)
+                c.JSON(http.StatusOK, CalculateResponse{OK: true, Operation: operation, Result: &amp;result})</span>
+        }
+}
+
+// respondError writes a failed CalculateResponse. Problems with the request
+// itself are 400s; valid requests describing an invalid operation are 422s.
+func respondError(c *gin.Context, operation *Operation, err error) {
+        <span class="cov8" title="1">var calcErr *calc.Error
+        if !errors.As(err, &amp;calcErr) </span>{
+                <span class="cov0" title="0">c.JSON(http.StatusInternalServerError, CalculateResponse{
+                        Error: &amp;ErrorBody{Code: "INTERNAL_ERROR", Message: "Internal error"},
+                })
+                return
+</span>        }
+
+        <span class="cov8" title="1">status := http.StatusUnprocessableEntity
+        if calcErr.Code == calc.CodeInvalidInput || calcErr.Code == calc.CodeOperandOutOfRange </span>{
+                <span class="cov8" title="1">status = http.StatusBadRequest
+</span>        }
+        <span class="cov8" title="1">c.JSON(status, CalculateResponse{
+                Operation: operation,
+                Error:     &amp;ErrorBody{Code: calcErr.Code, Message: calcErr.Message},
+        })</span>
+}
+
+func health(c *gin.Context) {
+        <span class="cov8" title="1">c.JSON(http.StatusOK, gin.H{"status": "ok"})
+</span>}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package api
+
+import (
+        "net/http"
+        "slices"
+
+        "github.com/gin-gonic/gin"
+
+        "calculator/internal/calc"
+)
+
+// Config configures the HTTP router.
+type Config struct {
+        // AllowedOrigins lists origins allowed to call the API cross-origin.
+        // Empty means same-origin only (e.g. through the Vite dev proxy).
+        AllowedOrigins []string
+        // StaticDir, if set, is a directory of frontend files (the Vite build)
+        // served for every non-API path.
+        StaticDir string
+}
+
+// NewRouter builds the router: POST /api/&lt;operator&gt; for every operator,
+// GET /api/health, and the frontend files when cfg.StaticDir is set.
+func NewRouter(cfg Config) *gin.Engine {
+        <span class="cov8" title="1">r := gin.New()
+        r.Use(gin.Logger(), gin.Recovery(), cors(cfg.AllowedOrigins))
+</span>        // We don't sit behind a proxy, so don't trust X-Forwarded-For.
+        <span class="cov8" title="1">_ = r.SetTrustedProxies(nil)
+</span>
+        <span class="cov8" title="1">api := r.Group("/api")
+        api.GET("/health", health)
+        for _, op := range calc.Operators </span>{
+                <span class="cov8" title="1">api.POST("/"+string(op), calculate(op))
+</span>        }
+        <span class="cov8" title="1">if cfg.StaticDir != "" </span>{
+                <span class="cov8" title="1">r.NoRoute(staticFiles(cfg.StaticDir))
+</span>        }
+        <span class="cov8" title="1">return r</span>
+}
+
+// cors allows cross-origin requests from the given origins and answers
+// preflight requests.
+func cors(allowedOrigins []string) gin.HandlerFunc {
+        <span class="cov8" title="1">return func(c *gin.Context) </span>{
+                <span class="cov8" title="1">origin := c.GetHeader("Origin")
+                if origin != "" &amp;&amp; slices.Contains(allowedOrigins, origin) </span>{
+                        <span class="cov8" title="1">h := c.Writer.Header()
+                        h.Set("Access-Control-Allow-Origin", origin)
+                        h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                        h.Set("Access-Control-Allow-Headers", "Content-Type")
+                        h.Add("Vary", "Origin")
+                        if c.Request.Method == http.MethodOptions </span>{
+                                <span class="cov8" title="1">c.AbortWithStatus(http.StatusNoContent)
+                                return
+</span>                        }
+                }
+                <span class="cov8" title="1">c.Next()</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package api
+
+import (
+        "net/http"
+        "strings"
+
+        "github.com/gin-gonic/gin"
+)
+
+// staticFiles serves the built frontend from dir for any GET/HEAD request
+// that no API route matched. Everything else gets a 404.
+//
+// Vite puts content-hashed files under /assets/, so those can be cached
+// forever. Other files (index.html) must be revalidated so a new deploy is
+// picked up.
+func staticFiles(dir string) gin.HandlerFunc {
+        <span class="cov8" title="1">files := http.FileServer(http.Dir(dir))
+        return func(c *gin.Context) </span>{
+                <span class="cov8" title="1">path := c.Request.URL.Path
+                method := c.Request.Method
+                isAPI := path == "/api" || strings.HasPrefix(path, "/api/")
+</span>                // No directory listings: only "/" may end in a slash (it serves index.html).
+                <span class="cov8" title="1">isDir := path != "/" &amp;&amp; strings.HasSuffix(path, "/")
+                if (method != http.MethodGet &amp;&amp; method != http.MethodHead) || isAPI || isDir </span>{
+                        <span class="cov8" title="1">c.Status(http.StatusNotFound)
+                        return
+</span>                }
+
+                <span class="cov8" title="1">if strings.HasPrefix(path, "/assets/") </span>{
+                        <span class="cov8" title="1">c.Header("Cache-Control", "public, max-age=31536000, immutable")
+</span>                } else {
+                        <span class="cov8" title="1">c.Header("Cache-Control", "no-cache")
+</span>                }
+                <span class="cov8" title="1">files.ServeHTTP(c.Writer, c.Request)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package calc
+
+// Code is a stable, machine-readable identifier for a calculation error.
+type Code string
+
+const (
+        CodeDivisionByZero      Code = "DIVISION_BY_ZERO"
+        CodeZeroToNegativePower Code = "ZERO_TO_NEGATIVE_POWER"
+        CodeComplexResult       Code = "COMPLEX_RESULT"
+        CodeResultTooLarge      Code = "RESULT_TOO_LARGE"
+        CodeResultTooSmall      Code = "RESULT_TOO_SMALL"
+        CodeOperandOutOfRange   Code = "OPERAND_OUT_OF_RANGE"
+        CodeInvalidInput        Code = "INVALID_INPUT"
+)
+
+// Error is a calculation error with a stable code and a human-readable message.
+type Error struct {
+        Code    Code
+        Message string
+}
+
+func (e *Error) Error() string { <span class="cov8" title="1">return e.Message }</span>
+
+// Sentinel errors returned by this package. Compare with errors.Is.
+var (
+        ErrDivisionByZero      = &amp;Error{CodeDivisionByZero, "Division by 0"}
+        ErrZeroToNegativePower = &amp;Error{CodeZeroToNegativePower, "0 raised to a negative power"}
+        ErrComplexResult       = &amp;Error{CodeComplexResult, "Result is not a real number"}
+        ErrResultTooLarge      = &amp;Error{CodeResultTooLarge, "Result is too large"}
+        ErrResultTooSmall      = &amp;Error{CodeResultTooSmall, "Result is too small"}
+        ErrOperandOutOfRange   = &amp;Error{CodeOperandOutOfRange, "Number is out of range"}
+        ErrInvalidInput        = &amp;Error{CodeInvalidInput, "Invalid number"}
+        ErrUnknownOperator     = &amp;Error{CodeInvalidInput, "Unknown operator"}
+)
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package calc
+
+import "math"
+
+// Evaluate applies op to a and b. The result is rounded to SignificantDigits
+// and checked against the limits. Errors are always *Error values.
+func Evaluate(op Operator, a, b float64) (float64, error) {
+        <span class="cov8" title="1">if !op.Valid() </span>{
+                <span class="cov8" title="1">return 0, ErrUnknownOperator
+</span>        }
+        <span class="cov8" title="1">if err := checkOperand(a); err != nil </span>{
+                <span class="cov8" title="1">return 0, err
+</span>        }
+        <span class="cov8" title="1">if err := checkOperand(b); err != nil </span>{
+                <span class="cov8" title="1">return 0, err
+</span>        }
+
+        <span class="cov8" title="1">var r float64
+</span>        // mustBeNonZero is set when the exact result can't be 0, so a 0 from the
+        // float operation means it underflowed.
+        <span class="cov8" title="1">var mustBeNonZero bool
+</span>
+        <span class="cov8" title="1">switch op </span>{
+        case Add:
+                <span class="cov8" title="1">r = a + b</span>
+        case Subtract:
+                <span class="cov8" title="1">r = a - b</span>
+        case Multiply:
+                <span class="cov8" title="1">r = a * b
+                mustBeNonZero = a != 0 &amp;&amp; b != 0</span>
+        case Divide:
+                <span class="cov8" title="1">if b == 0 </span>{
+                        <span class="cov8" title="1">return 0, ErrDivisionByZero
+</span>                }
+                <span class="cov8" title="1">r = a / b
+                mustBeNonZero = a != 0</span>
+        case Power:
+                <span class="cov8" title="1">if a == 0 &amp;&amp; b &lt; 0 </span>{
+                        <span class="cov8" title="1">return 0, ErrZeroToNegativePower
+</span>                }
+                <span class="cov8" title="1">if a &lt; 0 &amp;&amp; b != math.Trunc(b) </span>{
+                        <span class="cov8" title="1">return 0, ErrComplexResult
+</span>                }
+                <span class="cov8" title="1">r = math.Pow(a, b)
+                mustBeNonZero = a != 0</span>
+        }
+
+        <span class="cov8" title="1">if math.IsInf(r, 0) </span>{
+                <span class="cov8" title="1">return 0, ErrResultTooLarge
+</span>        }
+        <span class="cov8" title="1">if r == 0 &amp;&amp; mustBeNonZero </span>{
+                <span class="cov8" title="1">return 0, ErrResultTooSmall
+</span>        }
+        <span class="cov8" title="1">r = roundSignificant(r)
+        if err := checkResult(r); err != nil </span>{
+                <span class="cov8" title="1">return 0, err
+</span>        }
+        <span class="cov8" title="1">return normalizeZero(r), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package calc
+
+import "math"
+
+const (
+        // MaxMagnitude is the largest absolute value accepted as an operand or
+        // returned as a result (inclusive).
+        MaxMagnitude = 1e100
+        // MinMagnitude is the smallest non-zero absolute value accepted as an
+        // operand or returned as a result (inclusive).
+        MinMagnitude = 1e-100
+        // SignificantDigits is the precision results are rounded to. It sits just
+        // below float64's ~15.9 decimal digits, which hides binary artifacts such
+        // as 0.1 + 0.2 = 0.30000000000000004.
+        SignificantDigits = 15
+)
+
+// inRange reports whether x is zero or within [MinMagnitude, MaxMagnitude].
+func inRange(x float64) bool {
+        <span class="cov8" title="1">abs := math.Abs(x)
+        return x == 0 || (abs &gt;= MinMagnitude &amp;&amp; abs &lt;= MaxMagnitude)
+</span>}
+
+// checkOperand validates a number used as an operand.
+func checkOperand(x float64) error {
+        <span class="cov8" title="1">if math.IsNaN(x) || math.IsInf(x, 0) </span>{
+                <span class="cov8" title="1">return ErrInvalidInput
+</span>        }
+        <span class="cov8" title="1">if !inRange(x) </span>{
+                <span class="cov8" title="1">return ErrOperandOutOfRange
+</span>        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// checkResult validates an (already rounded) result.
+func checkResult(x float64) error {
+        <span class="cov8" title="1">switch </span>{
+        case math.IsNaN(x):
+                <span class="cov0" title="0">return ErrComplexResult</span>
+        case math.Abs(x) &gt; MaxMagnitude:
+                <span class="cov8" title="1">return ErrResultTooLarge</span>
+        case !inRange(x):
+                <span class="cov8" title="1">return ErrResultTooSmall</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package calc
+
+import (
+        "errors"
+        "math"
+        "regexp"
+        "strconv"
+        "strings"
+)
+
+// numberPattern accepts plain decimal numbers with an optional sign and
+// exponent: "12", "-0.5", "5.", ".5", "3e+12", "1.5E-7". It deliberately
+// rejects forms strconv.ParseFloat would otherwise accept, such as "Inf",
+// "NaN", hex floats and underscores.
+var numberPattern = regexp.MustCompile(`^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$`)
+
+// ParseNumber parses an operand string and checks it against the limits.
+func ParseNumber(s string) (float64, error) {
+        <span class="cov8" title="1">if !numberPattern.MatchString(s) </span>{
+                <span class="cov8" title="1">return 0, ErrInvalidInput
+</span>        }
+        <span class="cov8" title="1">x, err := strconv.ParseFloat(s, 64)
+        if errors.Is(err, strconv.ErrRange) </span>{
+                <span class="cov8" title="1">return 0, ErrOperandOutOfRange
+</span>        }
+        <span class="cov8" title="1">if err != nil </span>{
+                <span class="cov0" title="0">return 0, ErrInvalidInput
+</span>        }
+        // ParseFloat silently underflows tiny values (e.g. "1e-400") to 0.
+        <span class="cov8" title="1">if x == 0 &amp;&amp; hasNonZeroDigit(s) </span>{
+                <span class="cov8" title="1">return 0, ErrOperandOutOfRange
+</span>        }
+        <span class="cov8" title="1">if err := checkOperand(x); err != nil </span>{
+                <span class="cov8" title="1">return 0, err
+</span>        }
+        <span class="cov8" title="1">return normalizeZero(x), nil</span>
+}
+
+// hasNonZeroDigit reports whether the mantissa of a number string (the part
+// before any exponent) contains a digit other than 0.
+func hasNonZeroDigit(s string) bool {
+        <span class="cov8" title="1">mantissa, _, _ := strings.Cut(strings.ToLower(s), "e")
+        return strings.ContainsAny(mantissa, "123456789")
+</span>}
+
+// FormatNumber returns the canonical string for x: the shortest representation
+// that parses back to the same float64. Like JavaScript's Number#toString, it
+// uses plain notation for 1e-6 &lt;= |x| &lt; 1e21 and exponent notation otherwise.
+// This is a machine-readable format, not display text.
+func FormatNumber(x float64) string {
+        <span class="cov8" title="1">x = normalizeZero(x)
+        abs := math.Abs(x)
+        format := byte('f')
+        if abs != 0 &amp;&amp; (abs &lt; 1e-6 || abs &gt;= 1e21) </span>{
+                <span class="cov8" title="1">format = 'e'
+</span>        }
+        <span class="cov8" title="1">s := strconv.FormatFloat(x, format, -1, 64)
+        if format == 'e' </span>{
+                // Drop exponent zero-padding: "1e-07" -&gt; "1e-7".
+                <span class="cov8" title="1">if n := len(s); n &gt;= 4 &amp;&amp; s[n-4] == 'e' &amp;&amp; s[n-2] == '0' </span>{
+                        <span class="cov8" title="1">s = s[:n-2] + s[n-1:]
+</span>                }
+        }
+        <span class="cov8" title="1">return s</span>
+}
+
+// roundSignificant rounds x to SignificantDigits significant digits.
+func roundSignificant(x float64) float64 {
+        <span class="cov8" title="1">if x == 0 || math.IsNaN(x) || math.IsInf(x, 0) </span>{
+                <span class="cov8" title="1">return x
+</span>        }
+        <span class="cov8" title="1">r, _ := strconv.ParseFloat(strconv.FormatFloat(x, 'e', SignificantDigits-1, 64), 64)
+        return r</span>
+}
+
+// normalizeZero turns -0 into 0.
+func normalizeZero(x float64) float64 {
+        <span class="cov8" title="1">if x == 0 </span>{
+                <span class="cov8" title="1">return 0
+</span>        }
+        <span class="cov8" title="1">return x</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">// Package calc holds the calculator's domain logic: parsing operands,
+// evaluating binary operations, enforcing limits and producing canonical
+// number strings. It has no knowledge of HTTP or of how numbers are displayed.
+package calc
+
+// Operator identifies a binary operation. Values are stable identifiers meant
+// to be exposed to clients, not display symbols.
+type Operator string
+
+const (
+        Add      Operator = "add"
+        Subtract Operator = "subtract"
+        Multiply Operator = "multiply"
+        Divide   Operator = "divide"
+        Power    Operator = "power"
+)
+
+// Operators lists every supported operator.
+var Operators = []Operator{Add, Subtract, Multiply, Divide, Power}
+
+// Valid reports whether op is a supported operator.
+func (op Operator) Valid() bool {
+        <span class="cov8" title="1">switch op </span>{
+        case Add, Subtract, Multiply, Divide, Power:
+                <span class="cov8" title="1">return true</span>
+        }
+        <span class="cov8" title="1">return false</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package main
+
+import (
+        "log"
+        "net"
+        "os"
+        "strings"
+
+        "calculator/internal/api"
+)
+
+// Configuration comes from the environment:
+//
+//        HOST             address to bind (default "localhost")
+//        PORT             port to listen on (default "8080")
+//        ALLOWED_ORIGINS  comma-separated origins allowed cross-origin (default none)
+//        STATIC_DIR       directory of built frontend files to serve (default none: API only)
+func main() {
+        <span class="cov0" title="0">addr := net.JoinHostPort(getenv("HOST", "localhost"), getenv("PORT", "8080"))
+        router := api.NewRouter(api.Config{
+                AllowedOrigins: splitList(os.Getenv("ALLOWED_ORIGINS")),
+                StaticDir:      os.Getenv("STATIC_DIR"),
+        })
+</span>
+        <span class="cov0" title="0">log.Printf("calculator listening on %s", addr)
+        if err := router.Run(addr); err != nil </span>{
+                <span class="cov0" title="0">log.Fatal(err)
+</span>        }
+}
+
+func getenv(key, fallback string) string {
+        <span class="cov8" title="1">if v := os.Getenv(key); v != "" </span>{
+                <span class="cov8" title="1">return v
+</span>        }
+        <span class="cov8" title="1">return fallback</span>
+}
+
+func splitList(s string) []string {
+        <span class="cov8" title="1">var out []string
+        for _, item := range strings.Split(s, ",") </span>{
+                <span class="cov8" title="1">if item = strings.TrimSpace(item); item != "" </span>{
+                        <span class="cov8" title="1">out = append(out, item)
+</span>                }
+        }
+        <span class="cov8" title="1">return out</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

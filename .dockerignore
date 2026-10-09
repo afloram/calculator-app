@@ -1,0 +1,11 @@
+# Keep the build context small and avoid copying host builds into the image.
+**/node_modules
+**/dist
+**/.git
+**/*.log
+backend/calculator
+.claude
+**/coverage
+backend/coverage.*
+coverage-report
+docs

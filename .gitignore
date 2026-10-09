@@ -1,0 +1,18 @@
+# Project-wide ignores. frontend/.gitignore and backend/.gitignore cover
+# node_modules, build output and coverage reports for each side.
+
+# Editors and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Environment files (may contain secrets)
+.env
+.env.*
+
+# Go build output (`go build` in backend/) and test binaries
+backend/calculator
+*.test
+*.exe
